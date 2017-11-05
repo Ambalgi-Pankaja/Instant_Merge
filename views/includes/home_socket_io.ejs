@@ -1,0 +1,214 @@
+<script language="JavaScript">
+
+    socket.emit('initialized', sheetid, userid);
+
+    socket.emit('im_getUpdatedSheetData',sheetid,userid);
+
+    socket.on('afterDeSelection', function (values) {
+        for(var row=values[0];row<=values[2];row++) {
+            for(var col=values[1];col<=values[3];col++) {
+                lockedCells.pop(row+","+col);
+            }
+        }
+
+        hot.updateSettings({
+            cells: function (row, col, prop) {
+                var cellProperties = {};
+
+                if($.inArray(row+","+col, lockedCells) != -1) {
+                    cellProperties.readOnly = true;
+                    $(hot.getCell(row, col)).css({"background-color": "#CEC"});
+                }
+
+                return cellProperties;
+            }
+        });
+    });
+
+    socket.on('afterSelection', function (values) {
+        hot.updateSettings({
+            cells: function (row, col, prop) {
+                var cellProperties = {};
+
+                if ( (row>=values[0] && row <= values[2]) && (col>=values[1] && col <= values[3]) ) {
+                    cellProperties.readOnly = true;
+                    $(hot.getCell(row,col)).css({"background-color": "#CEC"});
+                    if($.inArray(row+","+col, lockedCells) == -1) {
+                        lockedCells.push(row + "," + col);
+                    }
+                } else {
+                    if($.inArray(row+","+col, lockedCells) != -1) {
+                        cellProperties.readOnly = true;
+                        $(hot.getCell(row, col)).css({"background-color": "#CEC"});
+                    }
+                }
+
+                return cellProperties;
+            }
+        });
+    });
+
+    socket.on ('afterCreateRow', function (values) {
+        rowManuallyAdded = true;
+        hot.alter('insert_row', values[0]);
+    });
+
+    socket.on('afterCreateCol', function(values) {
+        columnManuallyAdded = true;
+        hot.alter('insert_col', values[0]);
+    });
+
+    socket.on('afterRemoveCol', function(values) {
+        columnManuallyRemoved = true;
+        hot.alter('remove_col', values[0]);
+    });
+
+    socket.on('afterRemoveRow', function(values) {
+        rowManuallyRemoved = true;
+        hot.alter('remove_row', values[0]);
+    });
+
+    socket.on('beforeAutofill', function(values){
+        for(var row=values[0]['row']-1;row<=values[1]['row'];row++) {
+            for (var col=values[0]['col'];col<=values[1]['col'];col++)
+                hot.setDataAtCell(row, col, values[2][0][0]);
+        }
+    });
+
+    socket.on('afterSetDataAtCell', function(values){
+        cellValueManuallySet = true;
+        hot.setDataAtCell(values[0][0][0], values[0][0][1], values[0][0][3]);
+    });
+
+    socket.on('afterSetCellMeta', function(values) {
+        hot.updateSettings({
+            cells: function (row, col, prop) {
+                var cellProperties = {};
+
+                if($.inArray(row+","+col, lockedCells) != -1) {
+                    cellProperties.readOnly = true;
+                    $(hot.getCell(row, col)).css({"background-color": "#CEC"});
+                }
+
+                if(row == values[0] && col == values[1]) {
+                    cellProperties.className = values[2];
+                }
+
+                return cellProperties;
+            }
+        });
+    });
+
+    socket.on('mergeCells', function (values) {
+        var hotOptions = {};
+        hotOptions.mergeCells = [
+            {
+                row : values[0],
+                col : values[1],
+                rowspan : values[2] - values[0] + 1,
+                colspan : values[3] - values[1] +1
+            }
+        ];
+        hot.updateSettings(hotOptions);
+        hot.setDataAtCell(values[0],values[1], values[4]);
+    });
+
+    socket.on('im_saveSheet', function (saved) {
+        if(saved == true) {
+            alert('Sheet saved successfully.');
+        }else {
+            alert('Unfortunately there was some problem while saving.');
+        }
+    });
+
+    socket.on('im_createSheet', function (created, createdSheetId) {
+        if(created == true) {
+            if(sheetid == "") {
+                window.location = '/user/selectsheet?sheetid='+ createdSheetId;
+            }else {
+                $("#im_response_container").html('<p  class="bg-success">New sheet created.</p>');
+                $("#txt_container").removeClass('has-error');
+                $("#txt_container").addClass('has-success');
+
+                $("#sheets_dd").append(
+                    $('<option></option>')
+                        .attr('value', createdSheetId)
+                        .html(
+                            $("#sheetname_txt").val()
+                        )
+                );
+                $("#sheetname_txt").val('');
+            }
+        }else {
+            $("#im_response_container").html('<p  class="bg-danger">Unfortunately there was some problem while creating new sheet</p>');
+        }
+    });
+
+    socket.on('im_post_comment', function (values) {
+        if(values[0] == true) {
+            $("#comments_container").append(
+                $('<div></div>')
+                    .addClass('well well-sm')
+                    .css('margin', '5px')
+                    .html(
+                        '<strong>' + values[2] + '</strong>! ' + values[1]
+                    )
+            );
+
+            if(values[4]==userid) {
+                $("#comment_txt").val('');
+            }
+        }
+    });
+
+    socket.on('im_getUpdatedSheetData', function (senderid) {//my work
+        socket.emit('im_sendUpdatedSheetData',JSON.stringify(hot.getData()),sheetid,senderid);
+    });
+
+    socket.on('im_sendUpdatedSheetData', function (updatedSheetData) {//my work
+        hot.loadData(JSON.parse(updatedSheetData));
+    });
+
+    socket.on('im_post_chat', function (values) {
+        if(values[0] == true) {
+            if(values[4]==userid) {
+                $(".chat_text").append(
+                    $('<label></label>')
+                        .addClass('label label-success')
+                        .css('display', 'block')
+                        .css('text-align', 'right')
+                        .html(
+                            values[1]
+                        )
+                );
+                $("#im_textarea").val('');
+            }else {
+                $(".chat_text").append(
+                    $('<label></label>')
+                        .addClass('label label-info')
+                        .css('display', 'block')
+                        .css('text-align', 'left')
+                        .html(
+                            values[2] + ' : ' + values[1]
+                        )
+                );
+            }
+
+            $('.chat_text').scrollTop($('.chat_text').prop("scrollHeight"));
+        }
+    });
+
+    socket.on('im_share_sheet', function (response) {
+        var html;
+        if(response == 'shared') {
+            html = '<div class="alert alert-success fade in">Sheet shared successfully!</div>';
+        }else if(response == 'unknown_email') {
+            html = '<div class="alert alert-danger fade in">No such user exists!</div>';
+        } else if(response == 'already_shared') {
+            html = '<div class="alert alert-danger fade in">This sheet is already shared with entered user!</div>';
+        } else if(response == 'error') {
+            html = '<div class="alert alert-danger fade in">Unfortunately something went wrong!</div>';
+        }
+        $('#im_share_response_container').html(html);
+    });
+</script>

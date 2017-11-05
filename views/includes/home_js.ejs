@@ -1,0 +1,274 @@
+<script src="/jquery/jquery_3.1.1.min.js"></script>
+<script src="/bootstrap/js/bootstrap.min.js"></script>
+<script data-jsfiddle="common" src="/hansontable/dist/handsontable.full.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script language="JavaScript">
+
+    //=======================================Variables Declaration======================================================
+
+    var socket = io();
+
+    var lockedCells = [];
+    var lsr, lsc, ler, lec;
+    var columnManuallyRemoved,
+        rowManuallyRemoved,
+        rowManuallyAdded,
+        columnManuallyAdded,
+        cellValueManuallySet;
+
+    var sheetid = "<%=locals.session.sheetid%>";
+    var userid = "<%=locals.session.userid%>";
+    var username = "<%=locals.session.uname%>";
+
+    //========================================Events Handling===========================================================
+
+    $(document).ready(function () {
+        toggleChatBox();
+        $('.chat_text').scrollTop($('.chat_text').prop("scrollHeight"));
+
+        $('#im_chat').click(function () {
+            if($("#im_textarea").val().trim() != "") {
+                socket.emit('im_post_chat', $("#im_textarea").val().trim(), username, sheetid, userid);
+            }
+        });
+    });
+
+    $('#share_form').submit(function () {
+        if($('#shareemail_txt').val().trim() != '') {
+            socket.emit('im_share_sheet', $('#shareemail_txt').val(), username, sheetid, userid);
+        }
+        return false;
+    });
+
+    <% if(locals.session.sheetid == null) { %>
+        $('#selectSheetModal').modal({backdrop: 'static', keyboard: false});
+    <% } %>
+
+    $('#create_new_sheet_btn').click(function () {
+        $('#selectSheetModal').modal('toggle');
+        $('#newModal').modal({backdrop: 'static', keyboard: false});
+    });
+
+    $('#im_select_btn').click(function () {
+        window.location = '/user/selectsheet?sheetid='+ $('#sheets_dd').val();
+    });
+
+    $('#save_btn').click(function () {
+        saveSheet();
+    });
+
+    $("#comment_btn").click(function () {
+        if($("#comment_txt").val().trim() != '') {
+            socket.emit('im_post_comment',$('#comment_txt').val().trim(), username, sheetid, userid);
+        }
+    });
+
+    $("#im_success_btn").click(function () {
+        $("#im_response_container").html('');
+        if($("#sheetname_txt").val().trim() != "") {
+            socket.emit('im_createSheet', $("#sheetname_txt").val(), userid);
+        }else {
+            $("#txt_container").addClass('has-error');
+        }
+    });
+
+    $('.chat_title').click(function () {
+        toggleChatBox();
+    });
+
+    //=====================================JS Functions=================================================================
+
+    function toggleChatBox() {
+        $('.chat_inner_container').slideToggle({
+            direction: "up"
+        }, 300);
+    };
+
+    function saveSheet() {
+        socket.emit('im_saveSheet', JSON.stringify({ 'data' : hot.getData() }), sheetid, userid);
+    }
+
+    function im_download(strData, strFileName, strMimeType) {
+        var D = document,
+            A = arguments,
+            a = D.createElement("a"),
+            d = A[0],
+            n = A[1],
+            t = A[2] || "text/plain";
+
+        //build download link:
+        a.href = "data:" + strMimeType + "charset=utf-8," + escape(strData);
+
+        if (window.MSBlobBuilder) { // IE10
+            var bb = new MSBlobBuilder();
+            bb.append(strData);
+            return navigator.msSaveBlob(bb, strFileName);
+        } /* end if(window.MSBlobBuilder) */
+
+        if ('download' in a) { //FF20, CH19
+            a.setAttribute("download", n);
+            a.innerHTML = "downloading...";
+            D.body.appendChild(a);
+            setTimeout(function() {
+                var e = D.createEvent("MouseEvents");
+                e.initMouseEvent("click", true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+                a.dispatchEvent(e);
+                D.body.removeChild(a);
+            }, 66);
+            return true;
+        }; /* end if('download' in a) */
+
+        //do iframe dataURL download: (older W3)
+        var f = D.createElement("iframe");
+        D.body.appendChild(f);
+        f.src = "data:" + (A[2] ? A[2] : "application/octet-stream") + (window.btoa ? ";base64" : "") + "," + (window.btoa ? window.btoa : escape)(strData);
+        setTimeout(function() {
+            D.body.removeChild(f);
+        }, 333);
+        return true;
+    };
+
+    //=======================================HandsOnTable===============================================================
+
+    var headerHeight = 30;
+    var cellHeight = 24;
+    var minimumRowFitScreen = Math.floor(($(document).height()-$('#im_header').height()-headerHeight)/cellHeight);
+    var data;
+    var nullData = [
+        [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+    ];
+    <% if(locals.sheetData) { %>
+    data = <%-locals.sheetData%>;
+    data = data['data'];
+
+    <% } else { %>
+    data = nullData;
+    <% } %>
+    var container = document.getElementById('sheet'),
+        hot;
+
+    hot = new Handsontable(container, {
+        data: data,
+        minSpareRows: 2,
+        minRows : minimumRowFitScreen,
+        rowHeaders: true,
+        colHeaders: true,
+        stretchH: "all",
+        contextMenu: {
+            items:{
+                'row_above':{},
+                'row_below':{},
+                'col_left':{},
+                'col_right':{},
+                'remove_row':{},
+                'remove_col':{},
+                'alignment':{},
+                'mergeCells':{},
+                'export': {
+                    name: 'Export',
+                    callback: function (key, options) {
+                        im_download(JSON.stringify( { 'data': hot.getData() } ), 'instantMergeExports.im', 'text/plain');
+                    }
+                },
+                'save': {
+                    name: 'Save',
+                    callback: function (key, options) {
+                        saveSheet();
+                    }
+                },
+                'share': {
+                    name: 'Share',
+                    callback: function (key, options) {
+                        $('#shareModal').modal('toggle');
+                    }
+                }
+            },
+            callback: function(key, options){
+                var arr = key.split(':');
+                if(arr[0] == 'mergeCells') {
+                    socket.emit('mergeCells', options['start']['row'], options['start']['col'], options['end']['row'], options['end']['col'], hot.getDataAtCell(options['start']['row'],options['start']['col']), sheetid, userid);
+                }  else if(arr[0] == 'alignment') {
+                    var className = hot.getCellMeta(options['start']['row'], options['start']['col'])['className'];
+                    socket.emit('afterSetCellMeta', options['start']['row'], options['start']['col'], className, sheetid, userid);
+                }
+            }
+        },
+        mergeCells: true,
+        afterChange: function(changes, source){
+
+        },
+
+        afterSelection: function(sr, sc, er, ec) {
+            for(var row=sr;row<=er;row++) {
+                for(var col=sc;col<=ec;col++) {
+                    var cellProperties = hot.getCellMeta(row, col);
+                    if(cellProperties.readOnly) {
+                        return;
+                    }
+                }
+            }
+
+            if(lsr != null) {
+                socket.emit('afterDeSelection', lsr, lsc, ler, lec, sheetid, userid);
+            }
+
+            lsr = sr; lsc = sc; ler = er; lec = ec;
+
+            socket.emit('afterSelection', sr, sc, er, ec, sheetid, userid);
+        },
+
+        afterRemoveCol: function(index, amount) {
+            if(columnManuallyRemoved) {
+                columnManuallyRemoved = false;
+            }else {
+                socket.emit('afterRemoveCol', index, amount, sheetid, userid);
+            }
+        },
+
+        afterRemoveRow:function(index, amount) {
+            if(rowManuallyRemoved) {
+                rowManuallyRemoved = false;
+            } else {
+                socket.emit('afterRemoveRow', index, amount, sheetid, userid);
+            }
+        },
+
+        afterCreateRow: function (index, amount, source) {
+            if(rowManuallyAdded) {
+                rowManuallyAdded = false;
+            } else {
+                socket.emit ('afterCreateRow', index, amount, sheetid, userid);
+            }
+        },
+
+        afterCreateCol: function(index, amount){
+            if(columnManuallyAdded) {
+                columnManuallyAdded = false;
+            } else {
+                socket.emit('afterCreateCol', index, amount, sheetid, userid);
+            }
+        },
+
+        beforeAutofill: function(start,end,data) {
+            socket.emit('beforeAutofill', start, end, data, sheetid, userid);
+        },
+
+        afterSetDataAtCell : function (changes, source) {
+            if(cellValueManuallySet) {
+                cellValueManuallySet = false;
+            } else {
+                socket.emit('afterSetDataAtCell', changes, source, sheetid, userid);
+            }
+        },
+
+        afterSelectionEnd: function(r, p, r2, p2){
+            //after selection
+        },
+
+        afterContextMenuHide: function(context){
+            //menu hide
+        }
+    });
+
+</script>

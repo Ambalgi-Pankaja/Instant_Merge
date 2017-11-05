@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title><%= title %></title>
+
+    <link rel="icon"  type="image/png"  href="/images/favi.png">
+
+    <!-- Google Fonts -->
+    <link href='https://fonts.googleapis.com/css?family=Roboto+Slab:400,100,300,700|Lato:400,100,300,700,900' rel='stylesheet' type='text/css'>
+
+    <link rel="stylesheet" href="/stylesheets/animate.css">
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="/stylesheets/styles.css">
+
+    <link rel="stylesheet" href="/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/bootstrap/css/bootstrap-theme.min.css">
+
+    <style>
+        .required label {
+            font-weight: bold;
+        }
+        .required label:after {
+            color: #e32;
+            content: ' *';
+            display:inline;
+        }
+    </style>​
+
+    <script src="/jquery/jquery_3.1.1.min.js"></script>
+    <script src="/bootstrap/js/bootstrap.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+</head>
+
+<body>
+<div class="container">
+    <form action="#" method="post" id="im_signup_form">
+        <div class="top">
+            <h1 id="title" class="hidden"><span id="logo"><font size="6" face="calibri">CREATE ACCOUNT</font> </span></h1>
+        </div>
+        <div class="login-box animated fadeInUp">
+            <div class="box-header" style="padding: 10px;">
+                <a href="/"><img src="/images/home.png" style="width: 32px;display: inline;float: left;margin: 2px;"/></a>
+                <h2 style="color: #FFFFFF;display: inline;margin-right: 10%;">Sign Up</h2>
+            </div>
+            <div id="im_response_container"></div>
+            <div class="required" style="padding: 40px;">
+                <div class="form-group" id="contaier_uname">
+                    <label class="control-label" for="uname">&nbsp;User name</label>
+                    <input class="form-control" type="text" name="uname" id="uname" required ="true" minlength="4" maxlength="10" placeholder="Must be unique"  aria-describedby="validation_response_uname">
+                    <span id="validation_response_uname" class="help-block"></span>
+                </div>
+
+                <div class="form-group" id="contaier_fname">
+                    <label class="control-label" for="fname">&nbsp;First name</label>
+                    <input class="form-control" type="text" name="fname" id="fname" required ="true" maxlength="10" placeholder="Maximum 10 charatcters"  aria-describedby="validation_response_fname">
+                    <span id="validation_response_fname" class="help-block"></span>
+                </div>
+
+                <div class="form-group" id="contaier_lname">
+                    <label class="control-label" for="lname">&nbsp;Last name</label>
+                    <input class="form-control" type="text" name="lname" id="lname" required ="true" maxlength="10" placeholder="Maximum 10 charatcters"  aria-describedby="validation_response_lname">
+                    <span id="validation_response_lname" class="help-block"></span>
+                </div>
+
+                <div class="form-group" id="contaier_email">
+                    <label class="control-label" for="email">&nbsp;Email Id</label>
+                    <input class="form-control" type="email" name="email" id="email" required ="true" placeholder="name@abc.com" aria-describedby="validation_response_email">
+                    <span id="validation_response_email" class="help-block"></span>
+                </div>
+
+                <div class="form-group" id="contaier_pass">
+                    <label class="control-label" for="pass">&nbsp;Password</label>
+                    <input class="form-control" type="password" name="pass" id="pass" required ="true" aria-describedby="validation_response_pass">
+                    <span id="validation_response_pass" class="help-block"></span>
+                </div>
+
+                <div class="form-group" id="contaier_cpass">
+                    <label class="control-label" for="pass">&nbsp;Confirm Password</label>
+                    <input class="form-control" type="password" name="cpass" id="cpass" required ="true" aria-describedby="validation_response_cpass">
+                    <span id="validation_response_cpass" class="help-block"></span>
+                </div>
+
+            </div>
+            <button type="submit">Submit</button>
+        </div>
+    </form>
+</div>
+</body>
+
+
+<script>
+    var socket = io();
+
+    socket.on('im_signup_uname_change', function (unique) {
+        if(unique == true) {
+            name.parent().removeClass('has-error');
+            name.parent().addClass('has-success');
+            name.next().html("Username available.");
+        }else {
+            name.next().html("This username is not available.!");
+            name.parent().addClass('has-error');
+            name.focus();
+        }
+    });
+
+    socket.on('im_signup_email_change', function (unique) {
+        if(unique == true) {
+            email.parent().removeClass('has-error');
+            email.parent().addClass('has-success');
+            email.next().html("Email Id available.");
+        }else {
+            email.next().html("This email id is not available.!");
+            email.parent().addClass('has-error');
+            email.focus();
+        }
+    });
+
+    socket.on('im_signup_submit', function (userCreated) {
+        if(userCreated == true) {
+            $("#im_response_container").html('<p  class="bg-success">Account Created successfully.</p>');
+        }else {
+            $("#im_response_container").html('<p  class="bg-danger">Account with following email or username already exist.</p>');
+        }
+    });
+
+</script>
+<script>
+    $(document).ready(function () {
+        var pass = $("#pass");
+        var name = $("#uname");
+        var cpass = $('#cpass');
+        var email = $('#email');
+        var myForm = $ ('#im_signup_form');
+
+        name.change(function() {
+            if(name.val().length <4){
+                name.next().html("Username must contain minimum 4 characters.");
+                name.parent().addClass('has-error');
+                this.name.focus();
+                return false;
+            }
+            re = /^\w+$/;
+            if (!re.test(name.val())) {
+                name.next().html("Username must contain only letters, numbers and underscores!");
+                name.parent().addClass('has-error');
+                this.name.focus();
+                return false;
+            } else {
+                socket.emit('im_signup_uname_change', name.val());
+            }
+        });
+
+        email.change(function() {
+            if(email.val() == ''){
+                email.next().html("Email Id should be entered.");
+                email.parent().addClass('has-error');
+                this.email.focus();
+                return false;
+            }
+            else {
+                socket.emit('im_signup_email_change', email.val());
+            }
+        });
+
+       $('#im_signup_form').submit(function () {
+           $("#im_response_container").html('');
+            if(validateForm()) {
+                socket.emit('im_signup_submit', $('#uname').val(), $('#fname').val(), $('#lname').val(), $('#email').val(), $('#pass').val());
+            }
+            return false;
+        });
+
+        function validateForm() {
+
+            hideErros();
+
+            if (pass.val().length < 6) {
+                pass.next().html("Password must contain at least six characters!");
+                pass.parent().addClass('has-error');
+                this.pass.focus();
+                return false;
+            }
+
+            if (pass.value == name.val()) {
+                pass.next().html("Password must be different from Username");
+                pass.parent().addClass('has-error');
+                form.pass.focus();
+                return false;
+            }
+
+            re = /[0-9]/;
+            if (!re.test(pass.val())) {
+                pass.next().html("password must contain at least one number (0-9)!");
+                pass.parent().addClass('has-error');
+                pass.focus();
+                return false;
+            }
+
+            re = /[a-z]/;
+            if (!re.test(pass.val())) {
+                pass.next().html("Password must contain at least one lowercase letter (a-z)!");
+                pass.parent().addClass('has-error');
+                pass.focus();
+                return false;
+            }
+            re = /[A-Z]/;
+            if (!re.test(pass.val())) {
+                pass.next().html("Password must contain at least one uppercase letter (A-Z)!");
+                pass.parent().addClass('has-error');
+                pass.focus();
+                return false;
+            }
+
+            if (cpass.val() != pass.val()) {
+                cpass.next().html('Confirm password should match Password');
+                cpass.parent().addClass('has-error');
+                cpass.focus();
+                return false;
+            }
+
+            return true;
+        };
+
+        function hideErros() {
+            pass.next().html('');
+            pass.parent().removeClass('has-error');
+            cpass.next().html('');
+            cpass.parent().removeClass('has-error');
+        }
+    });
+
+</script>
+
+<script>
+    $(document).ready(function () {
+        $('#logo').addClass('animated fadeInDown');
+        $("input:text:visible:first").focus();
+    });
+    $('#uname').focus(function() {
+        $('label[for="uname"]').addClass('selected');
+    });
+    $('#uname').blur(function() {
+        $('label[for="uname"]').removeClass('selected');
+    });
+    $('#pass').focus(function() {
+        $('label[for="pass"]').addClass('selected');
+    });
+    $('#pass').blur(function() {
+        $('label[for="pass"]').removeClass('selected');
+    });
+</script>
+
+</html>

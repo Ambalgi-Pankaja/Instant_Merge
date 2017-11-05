@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title><%= title%></title>
+    <link rel="icon"  type="image/png"  href="/images/favi.png">
+
+    <!-------------------------------------------Include CSS------------------------------------------------------------>
+    <%- include includes/home_css.ejs%>
+
+</head>
+<body style="overflow-x: hidden;">
+    <div id="im_header" class="panel with-nav-tabs panel-default">
+        <div class="panel-heading">
+            <ul class="nav nav-tabs">
+                <li class="dropdown">
+                    <a href="#" data-toggle="dropdown">FILE<span class="caret"></span></a>
+                    <ul class="dropdown-menu" role="menu">
+                        <li><a data-toggle="modal" data-target="#newModal">New</a></li>
+                        <li><a href="#" data-toggle="modal" data-target="#selectSheetModal">Open</a></li>
+                        <li><a href="#" data-toggle="tab" id="save_btn">Save</a></li>
+                        <li><a href="#" onclick="window.print();">Print</a></li>
+                        <li><a data-toggle="modal" data-target="#shareModal">Share</a></li>
+                        <li><a href="/user/logout">Logout</a></li>
+                    </ul>
+                </li>
+                <li class="active"><a href="#homeTab" data-toggle="tab">HOME</a></li>
+                <li><a href="#dataTab" data-toggle="tab">DATA</a></li>
+                <li><a href="#shareTab" data-toggle="tab">SHARE</a></li>
+            </ul>
+        </div>
+        <div class="panel-body">
+            <div class="tab-content">
+                <div class="tab-pane fade in active" id="homeTab">
+                    <button class="glyphicon glyphicon-eye-open well im-top-btn" onclick="$('#selectSheetModal').modal('toggle');" title="Open" ></button>
+                    &nbsp;&nbsp;
+                    <button class="fa fa-cloud-download well im-top-btn" onclick="im_download(JSON.stringify( { 'data': hot.getData() } ), 'instantMergeExports.im', 'text/plain');" title="Export"></button>
+                    &nbsp;&nbsp;
+                    <button class="glyphicon glyphicon-floppy-disk well im-top-btn" onclick="saveSheet();" title="Save"></button>
+                    &nbsp;&nbsp;
+                    <button class="glyphicon glyphicon-print well im-top-btn" onclick="window.print();" title="Print"></button>
+                    &nbsp;&nbsp;
+                    <button class="glyphicon glyphicon-plus-sign well im-top-btn" onclick="$('#newModal').modal('toggle');" title="Create"></button>
+
+                    &nbsp;&nbsp;&nbsp;&nbsp;
+
+                    <a href="/user/logout"><button class="glyphicon glyphicon-log-in well im-top-btn" title="Logout"></button></a>
+
+                </div>
+                <div class="tab-pane fade in" id="dataTab">
+                    <button class="well im-top-btn" onclick="hot.loadData(nullData);" title="Clear All">
+                        <i class="fa fa-window-close-o" aria-hidden="true"></i>
+                    </button>
+
+                    &nbsp;&nbsp;
+
+                    <button class="well im-top-btn" onclick="socket.emit('im_getUpdatedSheetData',sheetid,userid);" title="Update sheet from partners">
+                        <i class="fa fa-level-up" aria-hidden="true"></i>
+                    </button>
+
+                    &nbsp;&nbsp;
+
+                    <button class="well im-top-btn" onclick="location.reload();" title="Refresh sheet">
+                        <i class="fa fa-refresh" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="tab-pane fade in" id="shareTab">
+                    <button class="glyphicon glyphicon-share-alt well im-top-btn" onclick="$('#shareModal').modal('toggle');" title="Share"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="sheet"></div>
+    <div class="row">
+        <div class="col-lg-12 panel well">
+            <div class="row">
+                <textarea class="form-control" style="width: 91%;margin-left: 40px;float: left;resize: none;padding-left: 10px;" placeholder="Type comment here..." name="comment_txt" id="comment_txt"></textarea>
+                <button class="btn btn-default" id="comment_btn" style="padding: 16px;">Post</button>
+            </div>
+            <div class="" id="comments_container" style="padding-left: 20px;">
+                <%
+                if(locals.comments) {
+                for(var  i = 0; i < locals.comments.length; i++) {%>
+                <div class="well well-sm" style="margin: 5px;">
+                    <%-'<strong>' + locals.comments[i]['uname']+'</strong>! ' + locals.comments[i]['description']%>
+                </div>
+                <%  }
+                }
+                %>
+            </div>
+        </div>
+        <div class="col-lg-3">
+            <div id="chat_container">
+                <div class="chat">
+                    <div class="chat_title">Live Chat</div>
+                    <div class="chat_inner_container" style="max-width: 300px;">
+                        <div class="chat_text">
+                            <%
+                            if(locals.chatmessages) {
+                                for(var  i = 0; i < locals.chatmessages.length; i++) {
+                                    if(locals.chatmessages[i]['uname'] == locals.session.uname) {
+                            %>
+                                        <label class="label label-success" style="display: block; text-align: right;">
+                                            <%=locals.chatmessages[i]['message']%>
+                                        </label>
+                            <%      } else {%>
+                                        <label class="label label-info" style="display: block;text-align: left;">
+                                            <%=locals.chatmessages[i]['uname']+' : ' + locals.chatmessages[i]['message']%>
+                                        </label>
+                            <%
+                                    }
+                                }
+                            }
+                            %>
+                        </div>
+                        <div class="chatbox">
+                            <input type="text" id="im_textarea"/>
+                            <button id="im_chat">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Sheet Modal -->
+    <div class="modal fade" id="newModal" role="dialog">
+        <div class="modal-dialog">
+
+            <!-- Modal content-->
+            <div class="modal-content">
+                <div class="modal-header">
+                    <% if(locals.session.sheetid) { %>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <% } else { %>
+                    <a href="/user/logout"><span class="glyphicon glyphicon-log-out" style="float: right;"></span></a>
+                    <% } %>
+                    <h4 class="modal-title">Create new sheet</h4>
+                </div>
+                <div class="modal-body">
+                    <div id="im_response_container"></div>
+                    Sheet name:
+                    <div class="form-group" id="txt_container">
+                        <input id="sheetname_txt" class="form-control" type="text" name="sheetname" placeholder="Name of new sheet" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" id="im_success_btn">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Select Sheet Modal -->
+    <div class="modal fade" id="selectSheetModal" role="dialog">
+        <div class="modal-dialog">
+
+            <!-- Modal content-->
+            <div class="modal-content">
+                <div class="modal-header">
+                    <% if(locals.session.sheetid) { %>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <% } else { %>
+                    <a href="/user/logout"><span class="glyphicon glyphicon-log-out" style="float: right;"></span></a>
+                    <% } %>
+                    <h4 class="modal-title">Select sheet</h4>
+                </div>
+                <div class="modal-body">
+                    <% if(locals.sheets){ %>
+                        <% if(locals.sheets.length > 0){ %>
+                            <select class="form-control" id="sheets_dd">
+                                <% for(var i=0; i<locals.sheets.length;i++) { %>
+                                    <option value="<%=locals.sheets[i]['sheetid']%>"><%=locals.sheets[i]['sheetname']%></option>
+                                <% } %>
+                            </select>
+                        <% } %>
+                    <% } %>
+                    <br />
+                    <button class="btn btn-info" id="create_new_sheet_btn">Create New Sheet</button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" id="im_select_btn">Select</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Sheet Modal -->
+    <div class="modal fade" id="shareModal" role="dialog">
+        <div class="modal-dialog">
+
+            <!-- Modal content-->
+            <div class="modal-content">
+                <div class="modal-header">
+                    <% if(locals.session.sheetid) { %>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <% } %>
+                    <h4 class="modal-title">Share with others</h4>
+                </div>
+
+                <form action='#' method="POST" id="share_form">
+                    <div class="modal-body">
+                        <div id="im_share_response_container"></div>
+                        <div id="im_sharing_container"></div>
+                        Email:
+                        <div class="form-group" id="txt_container">
+                            <input id="shareemail_txt" class="form-control" type="email" name="shareemail" placeholder="Enter email to invite mates" autofocus required>
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-default" id="im_send_btn">Send</button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+    <!-------------------------------------------Include JS------------------------------------------------------------>
+    <%- include includes/home_js.ejs%>
+    <!-------------------------------------------Include Socket.io------------------------------------------------------------>
+    <%- include includes/home_socket_io.ejs%>
+
+</body>
+</html>
